@@ -203,24 +203,21 @@ class AICouncilServer:
             context, question, responses, models
         )
         synthesis_duration = time.time() - synthesis_start
+        self.logger.info(f"Synthesis completed in {synthesis_duration:.2f}s", {
+            "synthesis_duration": synthesis_duration,
+            "synthesizer_model": selected_synthesizer.name
+        })
         
         # Prepare result
         total_duration = time.time() - start_time
         result = {
             "status": "success",
             "data": {
-                "models_used": [m.model_id for m in models],
-                "synthesizer_model": selected_synthesizer.name,
-                "final_synthesis": final_synthesis,
-                "timing": {
-                    "total_duration_ms": int(total_duration * 1000),
-                    "parallel_duration_ms": int(parallel_duration * 1000),
-                    "synthesis_duration_ms": int(synthesis_duration * 1000)
-                },
-                "response_summary": {
-                    "total_responses": len(responses),
-                    "valid_responses": len(valid_responses),
-                    "failed_responses": len(responses) - len(valid_responses)
+                "answer": final_synthesis,
+                "consensus": {
+                    "models_queried": len(models),
+                    "models_succeeded": len(valid_responses),
+                    "models_failed": len(responses) - len(valid_responses)
                 }
             }
         }
