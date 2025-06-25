@@ -54,8 +54,8 @@ class AICouncilConfig(BaseSettings):
     )
 
     # API Keys - simple approach
-    openai_api_key: Optional[str] = Field(default=None, description="OpenAI API key")
-    openrouter_api_key: Optional[str] = Field(default=None, description="OpenRouter API key")
+    openai_api_key: Optional[str] = Field(default=None, description="OpenAI API key", alias="OPENAI_API_KEY")
+    openrouter_api_key: Optional[str] = Field(default=None, description="OpenRouter API key", alias="OPENROUTER_API_KEY")
 
     # Settings with validation
     max_models: int = Field(
@@ -100,6 +100,12 @@ class AICouncilConfig(BaseSettings):
         enabled_models = [model for model in self.models if model.enabled]
         if len(enabled_models) < 2:
             raise ValueError("At least two models must be enabled")
+        
+        required_clients = [model.provider for model in enabled_models]
+        if Provider.OPENAI in required_clients and not self.openai_api_key:
+            raise ValueError("OpenAI API key is required if using OpenAI models")
+        if Provider.OPENROUTER in required_clients and not self.openrouter_api_key:
+            raise ValueError("OpenRouter API key is required if using OpenRouter models")
 
     def _get_default_models(self) -> List[ModelConfig]:
         """Get default model configuration for uvx usage."""
