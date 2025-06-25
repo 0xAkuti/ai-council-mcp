@@ -3,8 +3,8 @@ name = "ai-council"
 version = "0.1.0"
 description = "MCP server that consults multiple AI models in parallel and synthesizes their responses into comprehensive answers"
 authors = [{name = "Akuti", email = "a40723201+0xAkuti@users.noreply.github.com"}]
-license = {text = "MIT"}
-readme = "README.md"
+license = {file = "LICENSE"}
+readme = {file = "README.md", content-type = "text/markdown"}
 requires-python = ">=3.10"
 keywords = ["mcp", "model-context-protocol", "ai", "openai", "openrouter", "parallel-processing", "wisdom-of-crowds"]
 classifiers = [
@@ -12,7 +12,6 @@ classifiers = [
     "Intended Audience :: Developers", 
     "License :: OSI Approved :: MIT License",
     "Programming Language :: Python :: 3",
-
     "Programming Language :: Python :: 3.10",
     "Programming Language :: Python :: 3.11",
     "Programming Language :: Python :: 3.12",
@@ -25,6 +24,11 @@ dependencies = [
     "pyyaml>=6.0.2",
     "openai>=1.91.0",
 ]
+
+[project.urls]
+Homepage = "https://github.com/0xAkuti/ai-council"
+Repository = "https://github.com/0xAkuti/ai-council.git"
+Issues = "https://github.com/0xAkuti/ai-council/issues"
 
 [project.scripts]
 ai-council = "ai_council.main:main"
