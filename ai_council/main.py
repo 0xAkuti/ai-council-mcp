@@ -29,8 +29,16 @@ class AICouncilServer:
     
     def __init__(self):
         self.logger = AICouncilLogger()
-        self.model_manager = ModelManager()
-        self.synthesizer = ResponseSynthesizer(self.model_manager)
+        try:
+            self.model_manager = ModelManager(logger=self.logger)
+            self.synthesizer = ResponseSynthesizer(self.model_manager, logger=self.logger)
+        except ConfigValidationError as e:
+            self.logger.log(f"Configuration validation failed: {e}")
+            raise
+        except Exception as e:
+            self.logger.log(f"Failed to initialize AI Council Server: {e}")
+            raise
+        
         self.server = Server("ai-council")
         self._setup_handlers()
     
@@ -168,8 +176,15 @@ class AICouncilServer:
 def main():
     """Main entry point."""
     async def async_main():
-        server = AICouncilServer()
-        await server.run()
+        try:
+            server = AICouncilServer()
+            await server.run()
+        except ConfigValidationError as e:
+            print(f"Configuration error: {e}", file=sys.stderr)
+            sys.exit(1)
+        except Exception as e:
+            print(f"Failed to start AI Council server: {e}", file=sys.stderr)
+            sys.exit(1)
     
     asyncio.run(async_main())
 
