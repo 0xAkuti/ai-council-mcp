@@ -79,7 +79,17 @@ class AICouncilServer:
         async def handle_call_tool(name: str, arguments: Dict[str, Any]) -> List[types.TextContent]:
             """Handle tool calls."""
             if name != "ai_council":
-                raise ValueError(f"Unknown tool: {name}")
+                error_result = {
+                    "status": "error",
+                    "error": {
+                        "code": "UNKNOWN_TOOL",
+                        "message": f"Unknown tool: {name}",
+                        "type": "user_input_error",
+                        "details": f"The tool '{name}' is not supported. Available tools: ai_council"
+                    },
+                    "data": None
+                }
+                return [types.TextContent(type="text", text=json.dumps(error_result, indent=2))]
             
             try:
                 result = await self._process_ai_council(arguments)
@@ -87,8 +97,14 @@ class AICouncilServer:
             except Exception as e:
                 self.logger.error(f"Error in tool call: {e}")
                 error_result = {
-                    "error": str(e),
-                    "status": "failed"
+                    "status": "error",
+                    "error": {
+                        "code": "INTERNAL_ERROR",
+                        "message": "An unexpected error occurred during processing",
+                        "type": "system_error",
+                        "details": str(e)
+                    },
+                    "data": None
                 }
                 return [types.TextContent(type="text", text=json.dumps(error_result, indent=2))]
     
@@ -115,12 +131,34 @@ class AICouncilServer:
         context = arguments.get("context", "")
         question = arguments.get("question", "")
         
-        self._validate_input(context, question)
+        # Validate input parameters
+        try:
+            self._validate_input(context, question)
+        except ValueError as e:
+            return {
+                "status": "error",
+                "error": {
+                    "code": "INVALID_INPUT",
+                    "message": "Input validation failed",
+                    "type": "user_input_error",
+                    "details": str(e)
+                },
+                "data": None
+            }
         
         # Get enabled models
         models = self.model_manager.get_enabled_models()
         if not models:
-            raise ValueError("No enabled models found in configuration")
+            return {
+                "status": "error",
+                "error": {
+                    "code": "NOT_ENOUGH_MODELS_ENABLED",
+                    "message": "Not enough models enabled in configuration",
+                    "type": "configuration_error",
+                    "details": "At least two models must be enabled in the configuration to process requests"
+                },
+                "data": None
+            }
         
         self.logger.info("Starting AI Council process...", {
             "models": [{"name": m.name, "code_name": m.code_name} for m in models],
@@ -142,7 +180,19 @@ class AICouncilServer:
         # Check if we have any valid responses
         valid_responses = [r for r in responses if not r.startswith("Error from") and not r.startswith("Timeout error")]
         if not valid_responses:
-            raise ValueError("All models failed to provide valid responses")
+            return {
+                "status": "error",
+                "error": {
+                    "code": "ALL_MODELS_FAILED",
+                    "message": "All models failed to provide valid responses",
+                    "type": "service_error",
+                    "details": f"Attempted to call {len(models)} models but all failed or timed out"
+                },
+                "data": {
+                    "attempted_models": len(models),
+                    "failed_responses": len(responses)
+                }
+            }
         
         if len(valid_responses) < len(responses):
             self.logger.warning(f"Only {len(valid_responses)} out of {len(responses)} models provided valid responses")
@@ -157,20 +207,21 @@ class AICouncilServer:
         # Prepare result
         total_duration = time.time() - start_time
         result = {
-            "models_used": [m.model_id for m in models],
-            "synthesizer_model": selected_synthesizer.name,  # Use the actual selected model
-            "final_synthesis": final_synthesis,
-            "timing": {
-                "total_duration_ms": int(total_duration * 1000),
-                "parallel_duration_ms": int(parallel_duration * 1000),
-                "synthesis_duration_ms": int(synthesis_duration * 1000)
-            },
-
             "status": "success",
-            "response_summary": {
-                "total_responses": len(responses),
-                "valid_responses": len(valid_responses),
-                "failed_responses": len(responses) - len(valid_responses)
+            "data": {
+                "models_used": [m.model_id for m in models],
+                "synthesizer_model": selected_synthesizer.name,
+                "final_synthesis": final_synthesis,
+                "timing": {
+                    "total_duration_ms": int(total_duration * 1000),
+                    "parallel_duration_ms": int(parallel_duration * 1000),
+                    "synthesis_duration_ms": int(synthesis_duration * 1000)
+                },
+                "response_summary": {
+                    "total_responses": len(responses),
+                    "valid_responses": len(valid_responses),
+                    "failed_responses": len(responses) - len(valid_responses)
+                }
             }
         }
         
@@ -235,6 +286,7 @@ def main():
             
             config = load_config(config_file=args.config, **config_kwargs)
             
+            print(config.model_dump_json(indent=2))
             server = AICouncilServer(config=config)
             await server.run()
         except (ConfigValidationError, ValueError) as e:
