@@ -1,6 +1,6 @@
 import random
 import re
-from typing import List
+from typing import List, Tuple, Optional
 from .models import ModelConfig, ModelManager
 from .logger import AICouncilLogger
 
@@ -8,9 +8,9 @@ from .logger import AICouncilLogger
 class ResponseSynthesizer:
     """Handles synthesis of multiple model responses into a final answer."""
     
-    def __init__(self, model_manager: ModelManager):
+    def __init__(self, model_manager: ModelManager, logger: Optional[AICouncilLogger] = None):
         self.model_manager = model_manager
-        self.logger = AICouncilLogger()
+        self.logger = logger or AICouncilLogger()
     
     def create_synthesis_prompt(
         self, 
@@ -20,6 +20,17 @@ class ResponseSynthesizer:
         models: List[ModelConfig]
     ) -> str:
         """Create the synthesis prompt using anonymous code names."""
+        if len(responses) != len(models):
+            raise ValueError(f"Mismatch between responses ({len(responses)}) and models ({len(models)})")
+        
+        # Filter out error responses for synthesis
+        valid_pairs = [(response, model) for response, model in zip(responses, models) 
+                      if not response.startswith("Error from") and not response.startswith("Timeout error")]
+        
+        if not valid_pairs:
+            raise ValueError("No valid responses available for synthesis")
+        
+        valid_responses, valid_models = zip(*valid_pairs)
         
         prompt = f"""This is a high-level reasoning task. Your goal is to act as a critical and objective evaluator of the provided model outputs. Do not simply repeat the information; your value is in the synthesis and analysis.
 
@@ -30,9 +41,9 @@ class ResponseSynthesizer:
 > {question}
 
 **Analysis Task:**
-You have been provided with responses to the above question from different AI systems ({', '.join([m.code_name for m in models[:len(responses)]])}). Your task is to critically evaluate these responses and generate a single, comprehensive, and well-reasoned final answer.
+You have been provided with responses to the above question from different AI systems ({', '.join([m.code_name for m in valid_models])}). Your task is to critically evaluate these responses and generate a single, comprehensive, and well-reasoned final answer.
 
-IMPORTANT: Use only the provided system code names ({', '.join([m.code_name for m in models[:len(responses)]])}) when referring to the systems. Do not speculate about their actual identities.
+IMPORTANT: Use only the provided system code names ({', '.join([m.code_name for m in valid_models])}) when referring to the systems. Do not speculate about their actual identities.
 
 Please structure your response by following these steps:
 
@@ -53,7 +64,7 @@ Please structure your response by following these steps:
 **System Responses for Analysis:**
 ---"""
         
-        for i, (response, model) in enumerate(zip(responses, models)):
+        for response, model in valid_pairs:
             prompt += f"\n**{model.code_name} Response:**\n> {response}\n---"
         
         prompt += "\n\n**Final Synthesized Answer:**\n(Begin your final answer here, following the three steps outlined in the Analysis Task.)"
@@ -71,6 +82,9 @@ Please structure your response by following these steps:
     
     def select_synthesizer_model(self, models: List[ModelConfig]) -> ModelConfig:
         """Select which model will act as the synthesizer."""
+        if not models:
+            raise ValueError("No models available for synthesis")
+        
         selection_method = self.model_manager.config.get("settings", {}).get(
             "synthesis_model_selection", "random"
         )
@@ -88,8 +102,17 @@ Please structure your response by following these steps:
         question: str,
         responses: List[str],
         models: List[ModelConfig]
-    ) -> str:
-        """Synthesize multiple model responses into a final answer."""
+    ) -> Tuple[str, ModelConfig]:
+        """Synthesize multiple model responses into a final answer.
+        
+        Returns:
+            Tuple of (final_synthesis, selected_synthesizer_model)
+        """
+        if not responses or not models:
+            raise ValueError("No responses or models provided for synthesis")
+        
+        if len(responses) != len(models):
+            raise ValueError(f"Mismatch between responses ({len(responses)}) and models ({len(models)})")
         
         # Select synthesizer model
         synthesizer_model = self.select_synthesizer_model(models)
@@ -99,7 +122,17 @@ Please structure your response by following these steps:
         })
         
         # Create synthesis prompt
-        synthesis_prompt = self.create_synthesis_prompt(context, question, responses, models)
+        try:
+            synthesis_prompt = self.create_synthesis_prompt(context, question, responses, models)
+        except ValueError as e:
+            self.logger.log(f"Failed to create synthesis prompt: {e}")
+            # Fallback: return the best available response
+            valid_responses = [r for r in responses if not r.startswith("Error from") and not r.startswith("Timeout error")]
+            if valid_responses:
+                return valid_responses[0], synthesizer_model
+            else:
+                return "All models failed to provide valid responses.", synthesizer_model
+        
         self.logger.log("Generating final synthesis...", {
             "prompt_length": len(synthesis_prompt),
             "synthesizer_model": synthesizer_model.name
@@ -113,6 +146,16 @@ Please structure your response by following these steps:
             is_synthesis=True
         )
         
+        # Check if synthesis failed
+        if raw_synthesis.startswith("Error from") or raw_synthesis.startswith("Timeout error"):
+            self.logger.log(f"Synthesis failed: {raw_synthesis}")
+            # Fallback: return the first valid response
+            valid_responses = [r for r in responses if not r.startswith("Error from") and not r.startswith("Timeout error")]
+            if valid_responses:
+                return f"Synthesis failed, using fallback response:\n\n{valid_responses[0]}", synthesizer_model
+            else:
+                return "All models failed to provide valid responses, including synthesis.", synthesizer_model
+        
         # Replace code names with real model names
         final_synthesis = self.replace_code_names_with_real_names(raw_synthesis, models)
         
@@ -120,4 +163,4 @@ Please structure your response by following these steps:
             "synthesis_length": len(final_synthesis)
         })
         
-        return final_synthesis 
+        return final_synthesis, synthesizer_model 
