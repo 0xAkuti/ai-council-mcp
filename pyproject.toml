@@ -44,5 +44,4 @@ packages = ["ai_council"]
 include = [
     "/ai_council",
     "/config.yaml",
-    "/README.md",
 ]
