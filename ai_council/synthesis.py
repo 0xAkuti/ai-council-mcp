@@ -20,7 +20,6 @@ class ResponseSynthesizer:
         models: List[ModelConfig]
     ) -> str:
         """Create the synthesis prompt using anonymous code names."""
-        response1, response2, response3 = responses[:3]  # Take up to 3 responses
         
         prompt = f"""This is a high-level reasoning task. Your goal is to act as a critical and objective evaluator of the provided model outputs. Do not simply repeat the information; your value is in the synthesis and analysis.
 
