@@ -19,7 +19,7 @@ from mcp.types import (
 import mcp.types as types
 from pydantic import AnyUrl
 
-from .models import ModelManager
+from .models import ModelManager, ConfigValidationError
 from .synthesis import ResponseSynthesizer
 from .logger import AICouncilLogger
 
@@ -89,6 +89,21 @@ class AICouncilServer:
                 }
                 return [types.TextContent(type="text", text=json.dumps(error_result, indent=2))]
     
+    def _validate_input(self, context: str, question: str) -> None:
+        """Validate input parameters."""
+        if not context or not context.strip():
+            raise ValueError("Context cannot be empty")
+        
+        if not question or not question.strip():
+            raise ValueError("Question cannot be empty")
+        
+        # Basic length validation
+        if len(context) > 10000:
+            raise ValueError("Context too long (max 10,000 characters)")
+        
+        if len(question) > 5000:
+            raise ValueError("Question too long (max 5,000 characters)")
+    
     async def _process_ai_council(self, arguments: Dict[str, Any]) -> Dict[str, Any]:
         """Process the AI council request."""
         start_time = time.time()
@@ -97,8 +112,7 @@ class AICouncilServer:
         context = arguments.get("context", "")
         question = arguments.get("question", "")
         
-        if not context or not question:
-            raise ValueError("Both 'context' and 'question' are required")
+        self._validate_input(context, question)
         
         # Get enabled models
         models = self.model_manager.get_enabled_models()
