@@ -4,7 +4,7 @@ import asyncio
 import json
 import time
 import sys
-from typing import Any, Dict, List
+from typing import Any, Dict, List, Optional, Union
 
 from mcp.server.models import InitializationOptions
 from mcp.server import NotificationOptions, Server
@@ -17,12 +17,51 @@ from mcp.types import (
     LoggingLevel
 )
 import mcp.types as types
-from pydantic import AnyUrl
+from pydantic import AnyUrl, BaseModel
 
 from .models import ModelManager, ConfigValidationError
 from .synthesis import ResponseSynthesizer
 from .logger import AICouncilLogger
 from .config import load_config
+
+
+# Response Models
+class ConsensusInfo(BaseModel):
+    """Information about model consensus."""
+    models_queried: int
+    models_succeeded: int
+    models_failed: int
+
+
+class SuccessData(BaseModel):
+    """Data returned on successful AI Council processing."""
+    answer: str
+    consensus: ConsensusInfo
+
+
+class ErrorInfo(BaseModel):
+    """Error information structure."""
+    code: str
+    message: str
+    type: str
+    details: str
+
+
+class SuccessResponse(BaseModel):
+    """Successful response from AI Council."""
+    status: str = "success"
+    data: SuccessData
+
+
+class ErrorResponse(BaseModel):
+    """Error response from AI Council."""
+    status: str = "error"
+    error: ErrorInfo
+    data: Optional[Dict[str, Any]] = None
+
+
+# Union type for all possible responses
+AICouncilResponse = Union[SuccessResponse, ErrorResponse]
 
 
 class AICouncilServer:
@@ -79,34 +118,30 @@ class AICouncilServer:
         async def handle_call_tool(name: str, arguments: Dict[str, Any]) -> List[types.TextContent]:
             """Handle tool calls."""
             if name != "ai_council":
-                error_result = {
-                    "status": "error",
-                    "error": {
-                        "code": "UNKNOWN_TOOL",
-                        "message": f"Unknown tool: {name}",
-                        "type": "user_input_error",
-                        "details": f"The tool '{name}' is not supported. Available tools: ai_council"
-                    },
-                    "data": None
-                }
-                return [types.TextContent(type="text", text=json.dumps(error_result, indent=2))]
+                error_result = ErrorResponse(
+                    error=ErrorInfo(
+                        code="UNKNOWN_TOOL",
+                        message=f"Unknown tool: {name}",
+                        type="user_input_error",
+                        details=f"The tool '{name}' is not supported. Available tools: ai_council"
+                    )
+                )
+                return [types.TextContent(type="text", text=error_result.model_dump_json(indent=2))]
             
             try:
                 result = await self._process_ai_council(arguments)
-                return [types.TextContent(type="text", text=json.dumps(result, indent=2))]
+                return [types.TextContent(type="text", text=result.model_dump_json(indent=2))]
             except Exception as e:
                 self.logger.error(f"Error in tool call: {e}")
-                error_result = {
-                    "status": "error",
-                    "error": {
-                        "code": "INTERNAL_ERROR",
-                        "message": "An unexpected error occurred during processing",
-                        "type": "system_error",
-                        "details": str(e)
-                    },
-                    "data": None
-                }
-                return [types.TextContent(type="text", text=json.dumps(error_result, indent=2))]
+                error_result = ErrorResponse(
+                    error=ErrorInfo(
+                        code="INTERNAL_ERROR",
+                        message="An unexpected error occurred during processing",
+                        type="system_error",
+                        details=str(e)
+                    )
+                )
+                return [types.TextContent(type="text", text=error_result.model_dump_json(indent=2))]
     
     def _validate_input(self, context: str, question: str) -> None:
         """Validate input parameters."""
@@ -123,7 +158,7 @@ class AICouncilServer:
         if len(question) > 5000:
             raise ValueError("Question too long (max 5,000 characters)")
     
-    async def _process_ai_council(self, arguments: Dict[str, Any]) -> Dict[str, Any]:
+    async def _process_ai_council(self, arguments: Dict[str, Any]) -> AICouncilResponse:
         """Process the AI council request."""
         start_time = time.time()
         
@@ -135,30 +170,26 @@ class AICouncilServer:
         try:
             self._validate_input(context, question)
         except ValueError as e:
-            return {
-                "status": "error",
-                "error": {
-                    "code": "INVALID_INPUT",
-                    "message": "Input validation failed",
-                    "type": "user_input_error",
-                    "details": str(e)
-                },
-                "data": None
-            }
+            return ErrorResponse(
+                error=ErrorInfo(
+                    code="INVALID_INPUT",
+                    message="Input validation failed",
+                    type="user_input_error",
+                    details=str(e)
+                )
+            )
         
         # Get enabled models
         models = self.model_manager.get_enabled_models()
         if not models:
-            return {
-                "status": "error",
-                "error": {
-                    "code": "NOT_ENOUGH_MODELS_ENABLED",
-                    "message": "Not enough models enabled in configuration",
-                    "type": "configuration_error",
-                    "details": "At least two models must be enabled in the configuration to process requests"
-                },
-                "data": None
-            }
+            return ErrorResponse(
+                error=ErrorInfo(
+                    code="NOT_ENOUGH_MODELS_ENABLED",
+                    message="Not enough models enabled in configuration",
+                    type="configuration_error",
+                    details="At least two models must be enabled in the configuration to process requests"
+                )
+            )
         
         self.logger.info("Starting AI Council process...", {
             "models": [{"name": m.name, "code_name": m.code_name} for m in models],
@@ -180,19 +211,18 @@ class AICouncilServer:
         # Check if we have any valid responses
         valid_responses = [r for r in responses if not r.startswith("Error from") and not r.startswith("Timeout error")]
         if not valid_responses:
-            return {
-                "status": "error",
-                "error": {
-                    "code": "ALL_MODELS_FAILED",
-                    "message": "All models failed to provide valid responses",
-                    "type": "service_error",
-                    "details": f"Attempted to call {len(models)} models but all failed or timed out"
-                },
-                "data": {
+            return ErrorResponse(
+                error=ErrorInfo(
+                    code="ALL_MODELS_FAILED",
+                    message="All models failed to provide valid responses",
+                    type="service_error",
+                    details=f"Attempted to call {len(models)} models but all failed or timed out"
+                ),
+                data={
                     "attempted_models": len(models),
                     "failed_responses": len(responses)
                 }
-            }
+            )
         
         if len(valid_responses) < len(responses):
             self.logger.warning(f"Only {len(valid_responses)} out of {len(responses)} models provided valid responses")
@@ -210,17 +240,16 @@ class AICouncilServer:
         
         # Prepare result
         total_duration = time.time() - start_time
-        result = {
-            "status": "success",
-            "data": {
-                "answer": final_synthesis,
-                "consensus": {
-                    "models_queried": len(models),
-                    "models_succeeded": len(valid_responses),
-                    "models_failed": len(responses) - len(valid_responses)
-                }
-            }
-        }
+        result = SuccessResponse(
+            data=SuccessData(
+                answer=final_synthesis,
+                consensus=ConsensusInfo(
+                    models_queried=len(models),
+                    models_succeeded=len(valid_responses),
+                    models_failed=len(responses) - len(valid_responses)
+                )
+            )
+        )
         
         self.logger.info("Process completed successfully", {
             "total_duration": total_duration
