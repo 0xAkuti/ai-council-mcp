@@ -33,10 +33,10 @@ class AICouncilServer:
             self.model_manager = ModelManager(logger=self.logger)
             self.synthesizer = ResponseSynthesizer(self.model_manager, logger=self.logger)
         except ConfigValidationError as e:
-            self.logger.log(f"Configuration validation failed: {e}")
+            self.logger.error(f"Configuration validation failed: {e}")
             raise
         except Exception as e:
-            self.logger.log(f"Failed to initialize AI Council Server: {e}")
+            self.logger.error(f"Failed to initialize AI Council Server: {e}")
             raise
         
         self.server = Server("ai-council")
@@ -79,12 +79,9 @@ class AICouncilServer:
                 result = await self._process_ai_council(arguments)
                 return [types.TextContent(type="text", text=json.dumps(result, indent=2))]
             except Exception as e:
-                self.logger.log(f"Error in tool call: {e}")
+                self.logger.error(f"Error in tool call: {e}")
                 error_result = {
                     "error": str(e),
-                    "debug": {
-                        "log_file": self.logger.get_log_path()
-                    },
                     "status": "failed"
                 }
                 return [types.TextContent(type="text", text=json.dumps(error_result, indent=2))]
@@ -119,19 +116,19 @@ class AICouncilServer:
         if not models:
             raise ValueError("No enabled models found in configuration")
         
-        self.logger.log("Starting AI Council process...", {
+        self.logger.info("Starting AI Council process...", {
             "models": [{"name": m.name, "code_name": m.code_name} for m in models],
             "model_count": len(models)
         })
         
         # Make parallel calls to all models
-        self.logger.log("Dispatching calls to all models in parallel")
+        self.logger.info("Dispatching calls to all models in parallel")
         parallel_start = time.time()
         
         responses = await self.model_manager.call_models_parallel(models, context, question)
         parallel_duration = time.time() - parallel_start
         
-        self.logger.log(f"All model responses received in {parallel_duration:.2f}s", {
+        self.logger.info(f"All model responses received in {parallel_duration:.2f}s", {
             "parallel_duration": parallel_duration,
             "response_lengths": [len(r) for r in responses]
         })
@@ -142,7 +139,7 @@ class AICouncilServer:
             raise ValueError("All models failed to provide valid responses")
         
         if len(valid_responses) < len(responses):
-            self.logger.log(f"Warning: Only {len(valid_responses)} out of {len(responses)} models provided valid responses")
+            self.logger.warning(f"Only {len(valid_responses)} out of {len(responses)} models provided valid responses")
         
         # Synthesize responses
         synthesis_start = time.time()
@@ -162,7 +159,7 @@ class AICouncilServer:
                 "parallel_duration_ms": int(parallel_duration * 1000),
                 "synthesis_duration_ms": int(synthesis_duration * 1000)
             },
-            "debug_log_file": self.logger.get_log_path(),
+
             "status": "success",
             "response_summary": {
                 "total_responses": len(responses),
@@ -171,9 +168,8 @@ class AICouncilServer:
             }
         }
         
-        self.logger.log("Process completed successfully", {
-            "total_duration": total_duration,
-            "log_path": self.logger.get_log_path()
+        self.logger.info("Process completed successfully", {
+            "total_duration": total_duration
         })
         
         return result
@@ -183,7 +179,7 @@ class AICouncilServer:
         # MCP server setup
         from mcp.server.stdio import stdio_server
         
-        self.logger.log("Starting AI Council MCP Server on stdio")
+        self.logger.info("Starting AI Council MCP Server on stdio")
         
         async with stdio_server() as (read_stream, write_stream):
             await self.server.run(

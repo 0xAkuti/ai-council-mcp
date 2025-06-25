@@ -116,7 +116,7 @@ Please structure your response by following these steps:
         
         # Select synthesizer model
         synthesizer_model = self.select_synthesizer_model(models)
-        self.logger.log(f"Selected {synthesizer_model.name} as synthesizer", {
+        self.logger.info(f"Selected {synthesizer_model.name} as synthesizer", {
             "synthesizer": synthesizer_model.name,
             "synthesizer_code_name": synthesizer_model.code_name
         })
@@ -125,7 +125,7 @@ Please structure your response by following these steps:
         try:
             synthesis_prompt = self.create_synthesis_prompt(context, question, responses, models)
         except ValueError as e:
-            self.logger.log(f"Failed to create synthesis prompt: {e}")
+            self.logger.error(f"Failed to create synthesis prompt: {e}")
             # Fallback: return the best available response
             valid_responses = [r for r in responses if not r.startswith("Error from") and not r.startswith("Timeout error")]
             if valid_responses:
@@ -133,7 +133,7 @@ Please structure your response by following these steps:
             else:
                 return "All models failed to provide valid responses.", synthesizer_model
         
-        self.logger.log("Generating final synthesis...", {
+        self.logger.info("Generating final synthesis...", {
             "prompt_length": len(synthesis_prompt),
             "synthesizer_model": synthesizer_model.name
         })
@@ -148,7 +148,7 @@ Please structure your response by following these steps:
         
         # Check if synthesis failed
         if raw_synthesis.startswith("Error from") or raw_synthesis.startswith("Timeout error"):
-            self.logger.log(f"Synthesis failed: {raw_synthesis}")
+            self.logger.error(f"Synthesis failed: {raw_synthesis}")
             # Fallback: return the first valid response
             valid_responses = [r for r in responses if not r.startswith("Error from") and not r.startswith("Timeout error")]
             if valid_responses:
@@ -159,7 +159,7 @@ Please structure your response by following these steps:
         # Replace code names with real model names
         final_synthesis = self.replace_code_names_with_real_names(raw_synthesis, models)
         
-        self.logger.log("Final synthesis completed and de-anonymized", {
+        self.logger.info("Final synthesis completed and de-anonymized", {
             "synthesis_length": len(final_synthesis)
         })
         

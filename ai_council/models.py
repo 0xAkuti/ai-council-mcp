@@ -1,4 +1,5 @@
 import asyncio
+import logging
 import os
 import time
 from typing import List, Dict, Any, Optional
@@ -30,6 +31,7 @@ class ModelManager:
         self.logger = logger or AICouncilLogger()
         self.config = self._load_config(config_path)
         self._validate_config()
+        self._apply_log_level()
         self.openai_client = None
         self.openrouter_client = None
         self._init_clients()
@@ -49,13 +51,13 @@ class ModelManager:
             
             return config
         except FileNotFoundError:
-            self.logger.log(f"Config file {config_path} not found, using defaults")
+            self.logger.warning(f"Config file {config_path} not found, using defaults")
             return self._get_default_config()
         except yaml.YAMLError as e:
-            self.logger.log(f"Error parsing YAML config: {e}")
+            self.logger.error(f"Error parsing YAML config: {e}")
             raise ConfigValidationError(f"Invalid YAML configuration: {e}")
         except Exception as e:
-            self.logger.log(f"Error loading config: {e}")
+            self.logger.error(f"Error loading config: {e}")
             return self._get_default_config()
     
     def _get_default_config(self) -> Dict[str, Any]:
@@ -113,6 +115,25 @@ class ModelManager:
         if not isinstance(timeout, int) or timeout < 1:
             raise ConfigValidationError("parallel_timeout must be a positive integer")
     
+    def _apply_log_level(self) -> None:
+        """Apply log level from configuration to the logger."""
+        log_level = self.config.get("settings", {}).get("log_level", "INFO")
+        
+        # Map string log levels to logging constants
+        level_map = {
+            "DEBUG": logging.DEBUG,
+            "INFO": logging.INFO,
+            "WARNING": logging.WARNING,
+            "ERROR": logging.ERROR,
+            "CRITICAL": logging.CRITICAL
+        }
+        
+        if log_level.upper() in level_map:
+            self.logger.set_level(level_map[log_level.upper()])
+        else:
+            self.logger.warning(f"Invalid log level '{log_level}' in config, using INFO")
+            self.logger.set_level(logging.INFO)
+    
     def _init_clients(self) -> None:
         """Initialize API clients."""
         api_keys = self.config.get("api_keys", {})
@@ -123,9 +144,9 @@ class ModelManager:
             try:
                 self.openai_client = AsyncOpenAI(api_key=openai_key)
             except Exception as e:
-                self.logger.log(f"Failed to initialize OpenAI client: {e}")
+                self.logger.error(f"Failed to initialize OpenAI client: {e}")
         else:
-            self.logger.log("Warning: No OpenAI API key found")
+            self.logger.warning("No OpenAI API key found")
         
         # OpenRouter client (using OpenAI format)
         openrouter_key = api_keys.get("openrouter_api_key", "")
@@ -136,9 +157,9 @@ class ModelManager:
                     base_url="https://openrouter.ai/api/v1"
                 )
             except Exception as e:
-                self.logger.log(f"Failed to initialize OpenRouter client: {e}")
+                self.logger.error(f"Failed to initialize OpenRouter client: {e}")
         else:
-            self.logger.log("Warning: No OpenRouter API key found")
+            self.logger.warning("No OpenRouter API key found")
     
     def get_enabled_models(self) -> List[ModelConfig]:
         """Get list of enabled models up to max_models limit."""
@@ -150,7 +171,7 @@ class ModelManager:
                 try:
                     models.append(ModelConfig(**model_data))
                 except Exception as e:
-                    self.logger.log(f"Error creating model config: {e}")
+                    self.logger.error(f"Error creating model config: {e}")
         
         return models
     
@@ -163,7 +184,7 @@ class ModelManager:
     ) -> str:
         """Make an API call to a specific model."""
         start_time = time.time()
-        self.logger.log(f"Calling {model_config.name}...", {
+        self.logger.debug(f"Calling {model_config.name}...", {
             "model": model_config.name,
             "code_name": model_config.code_name
         })
@@ -217,7 +238,7 @@ class ModelManager:
             
             duration = time.time() - start_time
             
-            self.logger.log(f"Received response from {model_config.name} in {duration:.2f}s", {
+            self.logger.debug(f"Received response from {model_config.name} in {duration:.2f}s", {
                 "model": model_config.name,
                 "duration": duration,
                 "response_length": len(content),
@@ -229,7 +250,7 @@ class ModelManager:
         except Exception as e:
             duration = time.time() - start_time
             error_msg = f"Error from {model_config.name}: {str(e)}"
-            self.logger.log(f"Error calling {model_config.name}", {
+            self.logger.error(f"Error calling {model_config.name}", {
                 "model": model_config.name,
                 "error": str(e),
                 "duration": duration
@@ -271,8 +292,8 @@ class ModelManager:
             return final_responses
             
         except asyncio.TimeoutError:
-            self.logger.log(f"Parallel calls timed out after {timeout}s")
+            self.logger.error(f"Parallel calls timed out after {timeout}s")
             return [f"Timeout error for model {model.name}" for model in models]
         except Exception as e:
-            self.logger.log(f"Error in parallel calls: {e}")
+            self.logger.error(f"Error in parallel calls: {e}")
             return [f"Error for model {model.name}: {str(e)}" for model in models] 
