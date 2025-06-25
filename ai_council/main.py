@@ -204,11 +204,40 @@ class AICouncilServer:
 
 def main():
     """Main entry point."""
+    import argparse
+    
+    # Simple argument parsing for basic options
+    parser = argparse.ArgumentParser(description="AI Council MCP Server")
+    # add api keys
+    parser.add_argument("--openai-api-key", help="OpenAI API key")
+    parser.add_argument("--openrouter-api-key", help="OpenRouter API key")
+    parser.add_argument("--max-models", type=int, help="Maximum number of models to use")
+    parser.add_argument("--log-level", choices=["DEBUG", "INFO", "WARNING", "ERROR"], help="Log level")
+    parser.add_argument("--config", help="Path to config file")
+    parser.add_argument("--parallel-timeout", type=int, help="Timeout for parallel calls")
+    
+    args = parser.parse_args()
+    
     async def async_main():
         try:
-            server = AICouncilServer()
+            # Create config with command line overrides
+            config_kwargs = {}
+            if args.openai_api_key:
+                config_kwargs['openai_api_key'] = args.openai_api_key
+            if args.openrouter_api_key:
+                config_kwargs['openrouter_api_key'] = args.openrouter_api_key
+            if args.max_models:
+                config_kwargs['max_models'] = args.max_models
+            if args.log_level:
+                config_kwargs['log_level'] = args.log_level
+            if args.parallel_timeout:
+                config_kwargs['parallel_timeout'] = args.parallel_timeout
+            
+            config = load_config(config_file=args.config, **config_kwargs)
+            
+            server = AICouncilServer(config=config)
             await server.run()
-        except ConfigValidationError as e:
+        except (ConfigValidationError, ValueError) as e:
             print(f"Configuration error: {e}", file=sys.stderr)
             sys.exit(1)
         except Exception as e:
