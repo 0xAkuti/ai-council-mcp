@@ -108,8 +108,9 @@ Please structure your response by following these steps:
         # Get synthesis response
         raw_synthesis = await self.model_manager.call_model(
             synthesizer_model, 
-            context,  # Use original context
-            synthesis_prompt
+            "",  # Empty context for synthesis
+            synthesis_prompt,  # Full synthesis prompt
+            is_synthesis=True
         )
         
         # Replace code names with real model names

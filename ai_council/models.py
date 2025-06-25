@@ -82,7 +82,8 @@ class ModelManager:
         self, 
         model_config: ModelConfig, 
         context: str, 
-        question: str
+        question: str,
+        is_synthesis: bool = False
     ) -> str:
         """Make an API call to a specific model."""
         start_time = time.time()
@@ -92,7 +93,11 @@ class ModelManager:
         })
         
         try:
-            prompt = f"Context: {context}\n\nQuestion: {question}\n\nPlease provide a detailed, well-reasoned answer."
+            # For synthesis calls, use the question as the full prompt
+            if is_synthesis:
+                prompt = question
+            else:
+                prompt = f"Context: {context}\n\nQuestion: {question}\n\nPlease provide a detailed, well-reasoned answer."
             
             # Choose the appropriate client
             if model_config.provider == "openai":
