@@ -146,7 +146,7 @@ class AICouncilServer:
         
         # Synthesize responses
         synthesis_start = time.time()
-        final_synthesis = await self.synthesizer.synthesize_responses(
+        final_synthesis, selected_synthesizer = await self.synthesizer.synthesize_responses(
             context, question, responses, models
         )
         synthesis_duration = time.time() - synthesis_start
@@ -155,7 +155,7 @@ class AICouncilServer:
         total_duration = time.time() - start_time
         result = {
             "models_used": [m.model_id for m in models],
-            "synthesizer_model": self.synthesizer.select_synthesizer_model(models).name,
+            "synthesizer_model": selected_synthesizer.name,  # Use the actual selected model
             "final_synthesis": final_synthesis,
             "timing": {
                 "total_duration_ms": int(total_duration * 1000),
