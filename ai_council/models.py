@@ -1,22 +1,9 @@
 import asyncio
-import logging
-import os
 import time
-from typing import List, Dict, Any, Optional
-from dataclasses import dataclass
-import yaml
+from typing import List, Optional
 from openai import AsyncOpenAI
 from .logger import AICouncilLogger
-
-
-@dataclass
-class ModelConfig:
-    """Configuration for a model."""
-    name: str
-    provider: str
-    model_id: str
-    code_name: str
-    enabled: bool
+from .config import AICouncilConfig, ModelConfig, load_config
 
 
 class ConfigValidationError(Exception):
@@ -27,133 +14,40 @@ class ConfigValidationError(Exception):
 class ModelManager:
     """Manages model configurations and API calls."""
     
-    def __init__(self, config_path: str = "config.yaml", logger: Optional[AICouncilLogger] = None):
+    def __init__(self, config: Optional[AICouncilConfig] = None, logger: Optional[AICouncilLogger] = None):
         self.logger = logger or AICouncilLogger()
-        self.config = self._load_config(config_path)
-        self._validate_config()
+        self.config = config or load_config()
         self._apply_log_level()
         self.openai_client = None
         self.openrouter_client = None
         self._init_clients()
     
-    def _load_config(self, config_path: str) -> Dict[str, Any]:
-        """Load configuration from YAML file."""
-        try:
-            with open(config_path, "r") as f:
-                config = yaml.safe_load(f)
-            
-            # Expand environment variables
-            api_keys = config.get("api_keys", {})
-            for key, value in api_keys.items():
-                if isinstance(value, str) and value.startswith("${") and value.endswith("}"):
-                    env_var = value[2:-1]
-                    api_keys[key] = os.environ.get(env_var, "")
-            
-            return config
-        except FileNotFoundError:
-            self.logger.warning(f"Config file {config_path} not found, using defaults")
-            return self._get_default_config()
-        except yaml.YAMLError as e:
-            self.logger.error(f"Error parsing YAML config: {e}")
-            raise ConfigValidationError(f"Invalid YAML configuration: {e}")
-        except Exception as e:
-            self.logger.error(f"Error loading config: {e}")
-            return self._get_default_config()
-    
-    def _get_default_config(self) -> Dict[str, Any]:
-        """Get default configuration when config file is missing or invalid."""
-        return {
-            "models": [],
-            "settings": {
-                "max_models": 3,
-                "parallel_timeout": 120,
-                "synthesis_model_selection": "random",
-                "log_level": "INFO"
-            },
-            "api_keys": {
-                "openai_api_key": "",
-                "openrouter_api_key": ""
-            }
-        }
-    
-    def _validate_config(self) -> None:
-        """Validate configuration structure and values."""
-        required_sections = ["models", "settings", "api_keys"]
-        for section in required_sections:
-            if section not in self.config:
-                raise ConfigValidationError(f"Missing required config section: {section}")
-        
-        # Validate models
-        models = self.config.get("models", [])
-        if not isinstance(models, list):
-            raise ConfigValidationError("Models must be a list")
-        
-        code_names = set()
-        for i, model in enumerate(models):
-            required_fields = ["name", "provider", "model_id", "code_name", "enabled"]
-            for field in required_fields:
-                if field not in model:
-                    raise ConfigValidationError(f"Model {i} missing required field: {field}")
-            
-            # Check for duplicate code names
-            code_name = model["code_name"]
-            if code_name in code_names:
-                raise ConfigValidationError(f"Duplicate code name: {code_name}")
-            code_names.add(code_name)
-            
-            # Validate provider
-            if model["provider"] not in ["openai", "openrouter"]:
-                raise ConfigValidationError(f"Unknown provider: {model['provider']}")
-        
-        # Validate settings
-        settings = self.config.get("settings", {})
-        max_models = settings.get("max_models", 3)
-        if not isinstance(max_models, int) or max_models < 1:
-            raise ConfigValidationError("max_models must be a positive integer")
-        
-        timeout = settings.get("parallel_timeout", 120)
-        if not isinstance(timeout, int) or timeout < 1:
-            raise ConfigValidationError("parallel_timeout must be a positive integer")
-    
     def _apply_log_level(self) -> None:
         """Apply log level from configuration to the logger."""
-        log_level = self.config.get("settings", {}).get("log_level", "INFO")
-        
-        # Map string log levels to logging constants
-        level_map = {
-            "DEBUG": logging.DEBUG,
-            "INFO": logging.INFO,
-            "WARNING": logging.WARNING,
-            "ERROR": logging.ERROR,
-            "CRITICAL": logging.CRITICAL
-        }
-        
-        if log_level.upper() in level_map:
-            self.logger.set_level(level_map[log_level.upper()])
-        else:
-            self.logger.warning(f"Invalid log level '{log_level}' in config, using INFO")
+        try:
+            log_level = self.config.get_log_level()
+            self.logger.set_level(log_level)
+        except Exception as e:
+            self.logger.warning(f"Failed to apply log level: {e}")
+            import logging
             self.logger.set_level(logging.INFO)
     
     def _init_clients(self) -> None:
         """Initialize API clients."""
-        api_keys = self.config.get("api_keys", {})
-        
         # OpenAI client
-        openai_key = api_keys.get("openai_api_key", "")
-        if openai_key and openai_key != "empty":
+        if self.config.openai_api_key:
             try:
-                self.openai_client = AsyncOpenAI(api_key=openai_key)
+                self.openai_client = AsyncOpenAI(api_key=self.config.openai_api_key)
             except Exception as e:
                 self.logger.error(f"Failed to initialize OpenAI client: {e}")
         else:
             self.logger.warning("No OpenAI API key found")
         
         # OpenRouter client (using OpenAI format)
-        openrouter_key = api_keys.get("openrouter_api_key", "")
-        if openrouter_key and openrouter_key != "empty":
+        if self.config.openrouter_api_key:
             try:
                 self.openrouter_client = AsyncOpenAI(
-                    api_key=openrouter_key,
+                    api_key=self.config.openrouter_api_key,
                     base_url="https://openrouter.ai/api/v1"
                 )
             except Exception as e:
@@ -163,17 +57,7 @@ class ModelManager:
     
     def get_enabled_models(self) -> List[ModelConfig]:
         """Get list of enabled models up to max_models limit."""
-        models = []
-        max_models = self.config.get("settings", {}).get("max_models", 3)
-        
-        for model_data in self.config.get("models", []):
-            if model_data.get("enabled", False) and len(models) < max_models:
-                try:
-                    models.append(ModelConfig(**model_data))
-                except Exception as e:
-                    self.logger.error(f"Error creating model config: {e}")
-        
-        return models
+        return self.config.get_enabled_models()
     
     async def call_model(
         self, 
@@ -206,7 +90,7 @@ class ModelManager:
             elif model_config.provider == "openrouter":
                 client = self.openrouter_client
             else:
-                raise ValueError(f"Unknown provider: {model_config.provider}")
+                raise ValueError(f"Unknown provider: {model_config.provider.value}")
             
             if not client:
                 raise ValueError(f"No client available for provider: {model_config.provider}")
@@ -267,7 +151,7 @@ class ModelManager:
         if not models:
             raise ValueError("No models provided for parallel calls")
         
-        timeout = self.config.get("settings", {}).get("parallel_timeout", 120)
+        timeout = self.config.parallel_timeout
         
         try:
             tasks = [

@@ -22,17 +22,23 @@ from pydantic import AnyUrl
 from .models import ModelManager, ConfigValidationError
 from .synthesis import ResponseSynthesizer
 from .logger import AICouncilLogger
+from .config import load_config
 
 
 class AICouncilServer:
     """Main MCP server for AI Council."""
     
-    def __init__(self):
+    def __init__(self, config=None):
         self.logger = AICouncilLogger()
         try:
-            self.model_manager = ModelManager(logger=self.logger)
+            # Load config if not provided
+            if config is None:
+                config = load_config()
+            
+            self.config = config
+            self.model_manager = ModelManager(config=config, logger=self.logger)
             self.synthesizer = ResponseSynthesizer(self.model_manager, logger=self.logger)
-        except ConfigValidationError as e:
+        except (ConfigValidationError, ValueError) as e:
             self.logger.error(f"Configuration validation failed: {e}")
             raise
         except Exception as e:

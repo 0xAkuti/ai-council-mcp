@@ -85,9 +85,7 @@ Please structure your response by following these steps:
         if not models:
             raise ValueError("No models available for synthesis")
         
-        selection_method = self.model_manager.config.get("settings", {}).get(
-            "synthesis_model_selection", "random"
-        )
+        selection_method = self.model_manager.config.synthesis_model_selection
         
         if selection_method == "random":
             return random.choice(models)
