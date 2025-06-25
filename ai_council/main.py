@@ -122,6 +122,14 @@ class AICouncilServer:
             "response_lengths": [len(r) for r in responses]
         })
         
+        # Check if we have any valid responses
+        valid_responses = [r for r in responses if not r.startswith("Error from") and not r.startswith("Timeout error")]
+        if not valid_responses:
+            raise ValueError("All models failed to provide valid responses")
+        
+        if len(valid_responses) < len(responses):
+            self.logger.log(f"Warning: Only {len(valid_responses)} out of {len(responses)} models provided valid responses")
+        
         # Synthesize responses
         synthesis_start = time.time()
         final_synthesis = await self.synthesizer.synthesize_responses(
@@ -141,7 +149,12 @@ class AICouncilServer:
                 "synthesis_duration_ms": int(synthesis_duration * 1000)
             },
             "debug_log_file": self.logger.get_log_path(),
-            "status": "success"
+            "status": "success",
+            "response_summary": {
+                "total_responses": len(responses),
+                "valid_responses": len(valid_responses),
+                "failed_responses": len(responses) - len(valid_responses)
+            }
         }
         
         self.logger.log("Process completed successfully", {
