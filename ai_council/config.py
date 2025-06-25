@@ -53,9 +53,9 @@ class AICouncilConfig(BaseSettings):
         extra="ignore"
     )
 
-    # API Keys - simple approach
-    openai_api_key: Optional[str] = Field(default=None, description="OpenAI API key", alias="OPENAI_API_KEY")
-    openrouter_api_key: Optional[str] = Field(default=None, description="OpenRouter API key", alias="OPENROUTER_API_KEY")
+    # API Keys, set alias to disable env prefix
+    openai_api_key: Optional[str] = Field(default=None, description="OpenAI API key", alias="openai_api_key")
+    openrouter_api_key: Optional[str] = Field(default=None, description="OpenRouter API key", alias="openrouter_api_key")
 
     # Settings with validation
     max_models: int = Field(
