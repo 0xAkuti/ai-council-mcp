@@ -270,7 +270,7 @@ class AICouncilServer:
                 write_stream,
                 InitializationOptions(
                     server_name="ai-council",
-                    server_version="0.2.2",
+                    server_version="0.2.3",
                     capabilities=self.server.get_capabilities(
                         notification_options=NotificationOptions(),
                         experimental_capabilities={}
