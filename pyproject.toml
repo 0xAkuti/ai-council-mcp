@@ -1,12 +1,31 @@
 [project]
 name = "ai-council"
 version = "0.1.0"
-description = "MCP server that consults multiple AI models in parallel and synthesizes their responses into comprehensive answers"
+description = "Multi-AI consensus tool: MCP server that queries multiple AI models (OpenAI, Claude, Gemini, custom APIs) in parallel, synthesizes responses for better accuracy, and reduces AI bias through ensemble decision-making"
 authors = [{name = "Akuti", email = "a40723201+0xAkuti@users.noreply.github.com"}]
 license = {file = "LICENSE"}
 readme = {file = "README.md", content-type = "text/markdown"}
 requires-python = ">=3.10"
-keywords = ["mcp", "model-context-protocol", "ai", "openai", "openrouter", "parallel-processing", "wisdom-of-crowds"]
+keywords = [
+    # Core functionality
+    "ai-council", "multi-model", "ai-aggregation", "ai-consensus", "model-ensemble", "ai-synthesis",
+    "parallel-ai", "ai-comparison", "wisdom-of-crowds", "ai-collaboration", "model-fusion", "cognition-wheel",
+    
+    # MCP and server
+    "mcp", "model-context-protocol", "mcp-server", "cursor-ai", "claude-desktop", "ai-tools",
+    
+    # AI providers and models
+    "openai", "openrouter", "claude", "gpt", "gemini", "anthropic", "perplexity", "together-ai",
+    "ai-api", "openai-compatible", "llm-api", "ai-proxy", "multi-llm",
+    
+    # Use cases and domains  
+    "ai-research", "ai-evaluation", "llm-evaluation", "ai-benchmarking", "ai-validation",
+    "decision-support", "expert-system", "ai-assistant", "chatbot", "ai-automation",
+    
+    # Technical terms
+    "async", "concurrent", "parallel-processing", "ai-pipeline", "llm-orchestration",
+    "bias-reduction", "response-synthesis", "ai-middleware", "api-aggregation"
+]
 classifiers = [
     "Development Status :: 4 - Beta",
     "Intended Audience :: Developers", 
