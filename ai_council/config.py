@@ -18,6 +18,7 @@ class Provider(str, Enum):
     """Supported AI providers."""
     OPENAI = "openai"
     OPENROUTER = "openrouter"
+    CUSTOM = "custom"
 
 
 class SynthesisModelSelection(str, Enum):
@@ -40,6 +41,8 @@ class ModelConfig(BaseModel):
     name: str = Field(..., min_length=1, description="Human-readable name of the model")
     model_id: str = Field(..., min_length=1, description="Provider-specific model identifier")
     provider: Provider = Field(default=Provider.OPENROUTER, description="AI provider")
+    base_url: Optional[str] = Field(default=None, description="Custom OpenAI-compatible API base URL (overrides provider default)")
+    api_key: Optional[str] = Field(default=None, description="API key for this specific model (overrides global keys)")
     code_name: Optional[str] = Field(default=None, description="Anonymous code name for bias reduction (auto-assigned if not provided)")
     enabled: bool = Field(default=True, description="Whether this model is enabled")
 
@@ -115,11 +118,7 @@ class AICouncilConfig(BaseSettings):
         if len(enabled_models) < 2:
             raise ValueError("At least two models must be enabled")
         
-        required_clients = [model.provider for model in enabled_models]
-        if Provider.OPENAI in required_clients and not self.openai_api_key:
-            raise ValueError("OpenAI API key is required if using OpenAI models")
-        if Provider.OPENROUTER in required_clients and not self.openrouter_api_key:
-            raise ValueError("OpenRouter API key is required if using OpenRouter models")
+        self._validate_api_key_requirements(enabled_models)
 
     def _assign_code_names(self) -> None:
         """Auto-assign code names to models that don't have them."""
@@ -167,6 +166,21 @@ class AICouncilConfig(BaseSettings):
         """Get logging level as integer constant."""
         return getattr(logging, self.log_level.value)
 
+    def _validate_api_key_requirements(self, enabled_models: List["ModelConfig"]) -> None:
+        """Validate that required API keys are available for enabled models."""
+        
+        for model in enabled_models:
+            if model.api_key:
+                continue
+            elif model.provider == Provider.CUSTOM:
+                if not model.base_url:
+                    raise ValueError("Custom endpoints require a base_url")
+                if not model.api_key:
+                    raise ValueError("Custom endpoints require an api_key")
+            elif model.provider == Provider.OPENAI and not self.openai_api_key:
+                raise ValueError("OpenAI API key is required if using OpenAI models")
+            elif model.provider == Provider.OPENROUTER and not self.openrouter_api_key:
+                raise ValueError("OpenRouter API key is required if using OpenRouter models")
 
 def load_config(
     config_file: Optional[str] = None,

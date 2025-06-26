@@ -3,7 +3,7 @@ import time
 from typing import List, Optional
 from openai import AsyncOpenAI
 from .logger import AICouncilLogger
-from .config import AICouncilConfig, ModelConfig, load_config
+from .config import AICouncilConfig, ModelConfig, Provider, load_config
 
 
 class ConfigValidationError(Exception):
@@ -18,9 +18,7 @@ class ModelManager:
         self.logger = logger or AICouncilLogger()
         self.config = config or load_config()
         self._apply_log_level()
-        self.openai_client = None
-        self.openrouter_client = None
-        self._init_clients()
+        self._validate_api_keys()
     
     def _apply_log_level(self) -> None:
         """Apply log level from configuration to the logger."""
@@ -32,29 +30,53 @@ class ModelManager:
             import logging
             self.logger.set_level(logging.INFO)
     
-    def _init_clients(self) -> None:
-        """Initialize API clients."""
-        # OpenAI client
+    def _validate_api_keys(self) -> None:
+        """Validate that required API keys are available."""
         if self.config.openai_api_key:
-            try:
-                self.openai_client = AsyncOpenAI(api_key=self.config.openai_api_key)
-            except Exception as e:
-                self.logger.error(f"Failed to initialize OpenAI client: {e}")
+            self.logger.debug("OpenAI API key found")
         else:
             self.logger.warning("No OpenAI API key found")
         
-        # OpenRouter client (using OpenAI format)
         if self.config.openrouter_api_key:
-            try:
-                self.openrouter_client = AsyncOpenAI(
-                    api_key=self.config.openrouter_api_key,
-                    base_url="https://openrouter.ai/api/v1"
-                )
-            except Exception as e:
-                self.logger.error(f"Failed to initialize OpenRouter client: {e}")
+            self.logger.debug("OpenRouter API key found")
         else:
             self.logger.warning("No OpenRouter API key found")
     
+    def _get_client_for_model(self, model_config: ModelConfig) -> AsyncOpenAI:
+        """Create an appropriate client for the given model configuration."""
+        # Determine which API key to use (priority: model-specific -> provider-specific)
+        api_key = ""
+        
+        if model_config.api_key:
+            # prefer to use model-specific API key if provided
+            api_key = model_config.api_key
+        elif model_config.provider == Provider.CUSTOM:
+            api_key = model_config.api_key
+            if not api_key:
+                raise ValueError(f"API key required for model {model_config.name} using custom endpoint.") 
+        elif model_config.provider == Provider.OPENAI:
+            api_key = self.config.openai_api_key
+            if not api_key:
+                raise ValueError(f"OpenAI API key required for model {model_config.name}")
+        elif model_config.provider == Provider.OPENROUTER:
+            api_key = self.config.openrouter_api_key
+            if not api_key:
+                raise ValueError(f"OpenRouter API key required for model {model_config.name}")
+        else:
+            raise ValueError(f"Unknown provider: {model_config.provider}")
+        
+        # Determine base URL
+        if model_config.provider == Provider.CUSTOM:
+            base_url = model_config.base_url
+        elif model_config.provider == Provider.OPENROUTER:
+            base_url = "https://openrouter.ai/api/v1"
+        else:
+            # OpenAI uses default base URL (None)
+            base_url = None
+        
+
+        return AsyncOpenAI(api_key=api_key, base_url=base_url)
+
     def get_enabled_models(self) -> List[ModelConfig]:
         """Get list of enabled models up to max_models limit."""
         return self.config.get_enabled_models()
@@ -85,15 +107,7 @@ class ModelManager:
                 prompt = f"Context: {context}\n\nQuestion: {question}\n\nPlease provide a detailed, well-reasoned answer."
             
             # Choose the appropriate client
-            if model_config.provider == "openai":
-                client = self.openai_client
-            elif model_config.provider == "openrouter":
-                client = self.openrouter_client
-            else:
-                raise ValueError(f"Unknown provider: {model_config.provider.value}")
-            
-            if not client:
-                raise ValueError(f"No client available for provider: {model_config.provider}")
+            client = self._get_client_for_model(model_config)
             
             # Make the API call with better error handling
             try:
