@@ -85,13 +85,13 @@ models:
   - name: "GPT-4o"
     provider: "openai" 
     model_id: "gpt-4o"
-    enabled: true
+    enabled: true # optional, defaults to true
     
   # use OpenRouter API
   - name: "Claude Sonnet"
     provider: "openrouter"
     model_id: "anthropic/claude-3.5-sonnet"
-    enabled: true
+    code_name: "Bob" # optional, auto assigned otherwise
   
   # or any custom OpenAI compatible API
   - name: "Perplexity"
@@ -99,7 +99,6 @@ models:
     model_id: "llama-3.1-sonar-large-128k-online"
     base_url: "https://api.perplexity.ai"
     api_key: "your_perplexity_key_here"
-    enabled: true
     
   # Local LLM (Ollama)
   - name: "Local Llama"
@@ -107,7 +106,6 @@ models:
     model_id: "llama-3b"
     base_url: "http://localhost:11434"
     api_key: "key-if-needed"
-    enabled: true
 ```
 
 ## 📖 How It Works
