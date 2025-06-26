@@ -18,43 +18,46 @@ AI Council transforms how you interact with AI by:
 
 ## 🚀 Quick Start
 
+1. Get your [OpenRouter](https://openrouter.ai/) api key.:
+
 ### Cursor IDE Setup
 
-1. Open Cursor Settings → MCP
-2. Add new MCP server:
+2. Open Cursor Settings → MCP
+3. Add new MCP server and set your api key:
 
 ```json
 {
   "ai-council": {
     "command": "uvx",
-    "args": [
-      "ai-council",
-      "--openrouter-api-key", "YOUR_OPENROUTER_API_KEY"
-    ],
-    "env": {}
+    "args": ["ai-council"],
+    "env": {
+      "OPENROUTER_API_KEY": "..."
+    }
   }
 }
 ```
 
 ### Claude Desktop Setup
 
-Edit `~/.claude_desktop_config.json`:
+2. Edit `~/.claude_desktop_config.json` and set your api key:
 
 ```json
 {
   "mcpServers": {
     "ai-council": {
       "command": "uvx",
-      "args": [
-        "ai-council",
-        "--openrouter-api-key", "YOUR_OPENROUTER_API_KEY"
-      ]
+      "args": ["ai-council"],
+      "env": {
+        "OPENROUTER_API_KEY": "..."
+      }
     }
   }
 }
 ```
 
-**That's it!** Ask any complex question and the AI Council tool will automatically engage multiple models.
+**That's it!** Ask any complex question and the AI Council tool will automatically engage multiple models. 
+
+By default it will use OpenRouter with Claude Sonnet 4, Gemini 2.5 Pro, and DeepSeek V3.
 
 ### CLI Arguments
 
@@ -136,3 +139,4 @@ AI Council extends these ideas with:
 - OpenRouter support for many model options with a single api key
 - Support for custom API endpoints
 - Improved error handling and logging
+- Using Python
