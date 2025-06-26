@@ -40,8 +40,15 @@ class ModelConfig(BaseModel):
     name: str = Field(..., min_length=1, description="Human-readable name of the model")
     provider: Provider = Field(..., description="AI provider")
     model_id: str = Field(..., min_length=1, description="Provider-specific model identifier")
-    code_name: str = Field(..., min_length=1, description="Anonymous code name for bias reduction")
+    code_name: Optional[str] = Field(default=None, description="Anonymous code name for bias reduction (auto-assigned if not provided)")
     enabled: bool = Field(default=True, description="Whether this model is enabled")
+
+
+# Default code names for anonymous model identification
+DEFAULT_CODE_NAMES = [
+    "Alpha", "Beta", "Gamma", "Delta", "Epsilon", 
+    "Zeta", "Eta", "Theta", "Iota", "Kappa"
+]
 
 
 class AICouncilConfig(BaseSettings):
@@ -91,8 +98,15 @@ class AICouncilConfig(BaseSettings):
         if not self.models:
             self.models = self._get_default_models()
         
+        # Validate model count limit
+        if len(self.models) > 10:
+            raise ValueError(f"Cannot configure more than 10 models (found {len(self.models)})")
+        
+        # Auto-assign code names if not provided
+        self._assign_code_names()
+        
         # Validate unique code names
-        code_names = [model.code_name for model in self.models]
+        code_names = [model.code_name for model in self.models if model.code_name]
         if len(code_names) != len(set(code_names)):
             raise ValueError("Duplicate code names found in model configuration")
         
@@ -107,6 +121,20 @@ class AICouncilConfig(BaseSettings):
         if Provider.OPENROUTER in required_clients and not self.openrouter_api_key:
             raise ValueError("OpenRouter API key is required if using OpenRouter models")
 
+    def _assign_code_names(self) -> None:
+        """Auto-assign code names to models that don't have them."""
+        available_names = DEFAULT_CODE_NAMES.copy()
+        
+        # First pass: remove already used code names from available list
+        for model in self.models:
+            if model.code_name and model.code_name in available_names:
+                available_names.remove(model.code_name)
+        
+        # Second pass: assign code names to models without them
+        for name_index, model in enumerate(self.models):
+            if not model.code_name:
+                model.code_name = available_names[name_index]
+
     def _get_default_models(self) -> List[ModelConfig]:
         """Get default model configuration for uvx usage."""
         return [
@@ -114,21 +142,18 @@ class AICouncilConfig(BaseSettings):
                 name="claude-sonnet-4",
                 provider=Provider.OPENROUTER,
                 model_id="anthropic/claude-sonnet-4",
-                code_name="Alpha",
                 enabled=True
             ),
             ModelConfig(
                 name="gemini-2.5-pro",
                 provider=Provider.OPENROUTER,
                 model_id="google/gemini-2.5-pro",
-                code_name="Beta",
                 enabled=True
             ),
             ModelConfig(
                 name="deepseek-chat-v3",
                 provider=Provider.OPENROUTER,
                 model_id="deepseek/deepseek-chat-v3-0324",
-                code_name="Gamma",
                 enabled=True
             )
         ]
