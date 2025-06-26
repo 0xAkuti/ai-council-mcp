@@ -38,8 +38,8 @@ class LogLevel(str, Enum):
 class ModelConfig(BaseModel):
     """Configuration for a single AI model."""
     name: str = Field(..., min_length=1, description="Human-readable name of the model")
-    provider: Provider = Field(..., description="AI provider")
     model_id: str = Field(..., min_length=1, description="Provider-specific model identifier")
+    provider: Provider = Field(default=Provider.OPENROUTER, description="AI provider")
     code_name: Optional[str] = Field(default=None, description="Anonymous code name for bias reduction (auto-assigned if not provided)")
     enabled: bool = Field(default=True, description="Whether this model is enabled")
 
