@@ -1,116 +1,140 @@
 # AI Council MCP Server
 
-An MCP server that consults multiple AI models in parallel and synthesizes their responses into comprehensive answers using a "wisdom of crowds" approach.
+> **Multi-AI Consensus Tool**: Query multiple AI models in parallel, synthesize responses for better accuracy, and reduce AI bias through ensemble decision-making.
 
-## Features
+AI Council is a powerful MCP (Model Context Protocol) server that harnesses the "wisdom of crowds" by consulting multiple AI models simultaneously. Get more reliable, comprehensive answers by combining insights from OpenAI, Claude, Gemini, and any OpenAI-compatible API.
 
-- **Configurable Models**: Support for both OpenAI and OpenRouter APIs with easy configuration via YAML
-- **Parallel Processing**: All models are queried simultaneously for faster results
-- **Bias Reduction**: Anonymous code names prevent synthesizer bias toward specific models
-- **Flexible Configuration**: Choose which models to use and how many to consult
-- **Detailed Logging**: Comprehensive debug logs for transparency and troubleshooting
-- **Robust Error Handling**: Graceful degradation when individual models fail
+## ✨ What is AI Council?
 
-## Installation
+AI Council transforms how you interact with AI by:
 
-### Option 1: Using uv (Recommended)
+- **🔄 Parallel Processing**: Queries multiple AI models simultaneously (not sequentially)
+- **🎯 Bias Reduction**: Uses anonymous code names to prevent synthesis bias
+- **⚡ Smart Synthesis**: One model synthesizes all responses into a comprehensive answer
+- **🔧 Universal Compatibility**: Works with OpenAI, OpenRouter, and any OpenAI-compatible API
+- **🛡️ Robust Error Handling**: Graceful degradation when individual models fail
 
-```bash
-# Clone the repository
-git clone <your-repo-url>
-cd ai-council
+**Perfect for**: Research questions, complex analysis, creative projects, technical decisions, and any task where multiple AI perspectives add value.
 
-# Install with uv
-uv sync
+## 🚀 Quick Start
 
-# Run the server
-uv run ai-council
+### Cursor IDE Setup
+
+1. Open Cursor Settings → MCP
+2. Add new MCP server:
+
+```json
+{
+  "ai-council": {
+    "command": "uvx",
+    "args": [
+      "ai-council",
+      "--openrouter-api-key", "YOUR_OPENROUTER_API_KEY"
+    ],
+    "env": {}
+  }
+}
 ```
 
-### Option 2: Using pip
+### Claude Desktop Setup
 
-```bash
-# Install dependencies
-pip install -r requirements.txt
+Edit `~/.claude_desktop_config.json`:
 
-# Run the server
-python -m ai_council.main
+```json
+{
+  "mcpServers": {
+    "ai-council": {
+      "command": "uvx",
+      "args": [
+        "ai-council",
+        "--openrouter-api-key", "YOUR_OPENROUTER_API_KEY"
+      ]
+    }
+  }
+}
 ```
 
-## Configuration
+**That's it!** Ask any complex question and the AI Council tool will automatically engage multiple models.
 
-### Environment Variables
+### CLI Arguments
 
-Set the following environment variables for the AI services you want to use:
+Use command-line arguments for quick setup, add any of these to the `args` in you mcp config:
 
-```bash
-export OPENAI_API_KEY="your_openai_api_key"
-export OPENROUTER_API_KEY="your_openrouter_api_key"
-```
+**Available CLI Arguments**:
+- `--openai-api-key`: Your OpenAI API key
+- `--openrouter-api-key`: Your OpenRouter API key  
+- `--max-models`: Maximum models to query (default: 3)
+- `--parallel-timeout`: Timeout in seconds (default: 60)
+- `--log-level`: Logging level (DEBUG, INFO, WARNING, ERROR)
+- `--config`: Path to custom config file
 
-### Model Configuration
+## ⚙️ Advanced Configuration
 
-Edit `config.yaml` to configure which models to use:
+For advanced setups, create a `config.yaml` file and link to it with `--config path/to/config.yaml`:
 
 ```yaml
+# config.yaml
+openai_api_key: "your_openai_key_here"
+openrouter_api_key: "your_openrouter_key_here"
+max_models: 3
+parallel_timeout: 90 # in seconds
+synthesis_model_selection: "random"  # or "first"
+
 models:
-  - name: "gpt-4o"
-    provider: "openai"
+  # use OpenAI API
+  - name: "GPT-4o"
+    provider: "openai" 
     model_id: "gpt-4o"
-    code_name: "Alpha"
     enabled: true
-  - name: "claude-3.5-sonnet"
+    
+  # use OpenRouter API
+  - name: "Claude Sonnet"
     provider: "openrouter"
     model_id: "anthropic/claude-3.5-sonnet"
-    code_name: "Beta"
     enabled: true
-  # Add more models as needed
-
-settings:
-  max_models: 3  # How many models to consult simultaneously
-  parallel_timeout: 120  # Timeout for parallel calls in seconds
-  synthesis_model_selection: "random"  # "random" or "first"
+  
+  # or any custom OpenAI compatible API
+  - name: "Perplexity"
+    provider: "custom"
+    model_id: "llama-3.1-sonar-large-128k-online"
+    base_url: "https://api.perplexity.ai"
+    api_key: "your_perplexity_key_here"
+    enabled: true
+    
+  # Local LLM (Ollama)
+  - name: "Local Llama"
+    provider: "custom" 
+    model_id: "llama-3b"
+    base_url: "http://localhost:11434"
+    api_key: "key-if-needed"
+    enabled: true
 ```
 
-## Usage with MCP Clients
+## 📖 How It Works
 
-### Cursor IDE
+AI Council uses a sophisticated three-phase approach:
 
-1. **Open Cursor Settings**:
-   - Go to Settings → MCP
-   - Click "Add new MCP server"
+### 1. **Parallel Consultation** 
+- Simultaneously queries your configured AI models
+- Maintains the same context and question for each model
+- Handles failures gracefully (continues with successful responses)
 
-2. **Configure the server**:
-   ```json
-   {
-     "ai-council": {
-       "command": "uv",
-       "args": ["run", "ai-council"],
-       "cwd": "/path/to/ai-council",
-       "env": {
-         "OPENAI_API_KEY": "your_openai_key",
-         "OPENROUTER_API_KEY": "your_openrouter_key"
-       }
-     }
-   }
-   ```
+### 2. **Anonymous Analysis**
+- Assigns code names (Alpha, Beta, Gamma, etc.) to each model's response
+- Prevents synthesis bias toward specific brands or providers
+- Preserves response quality while removing model identity
 
-3. **Test the integration**:
-   - Enter Agent mode in Cursor
-   - Ask a complex question that would benefit from multiple AI perspectives
-   - The `ai_council` tool should be automatically triggered
+### 3. **Smart Synthesis**
+- Randomly selects one model to act as the synthesizer
+- Synthesizer analyzes all anonymous responses
+- Produces a comprehensive answer combining the best insights
 
-## How It Works
+## 🤝 Acknowledgments
 
-AI Council follows a three-phase process:
+This project was inspired by [Cognition Wheel](https://github.com/Hormold/cognition-wheel).
 
-1. **Parallel Consultation**: Simultaneously queries the configured AI models
-2. **Anonymous Analysis**: Uses code names (Alpha, Beta, Gamma, etc.) to eliminate bias during synthesis
-3. **Smart Synthesis**: Randomly selects one of the models to act as a synthesizer, which analyzes all responses and produces a final, comprehensive answer
-
-## API
-
-The server provides a single tool called `ai_council` with the following parameters:
-
-- `context`: Background information and context for the problem
-- `question`: The specific question you want answered
+AI Council extends these ideas with:
+- Enhanced configuration flexibility  
+- OpenRouter support for many model options with a single api key
+- Support for custom API endpoints
+- Improved error handling and logging
