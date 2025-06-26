@@ -75,7 +75,7 @@ class AICouncilConfig(BaseSettings):
         description="Maximum number of models to consult simultaneously"
     )
     parallel_timeout: int = Field(
-        default=120,
+        default=60,
         ge=5,
         le=600,
         description="Timeout for parallel API calls in seconds"
