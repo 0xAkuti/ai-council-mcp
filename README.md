@@ -16,9 +16,24 @@ AI Council transforms how you interact with AI by:
 
 **Perfect for**: Research questions, complex analysis, creative projects, technical decisions, and any task where multiple AI perspectives add value.
 
+## 📋 Requirements
+- Python 3.10+
+- **uv** installed ([installation guide](https://docs.astral.sh/uv/getting-started/installation))
+- alternatively:
+  - **pipx** installed ([installation guide](https://pipx.pypa.io/stable/installation)), update config 
+    ```json
+      "command": "pipx",
+      "args": ["run", "ai-council"]
+    ```
+  - or manual install wiht `pip install ai-council`, and update config
+      ```json
+      "command": "ai-council",
+      "args": []
+    ```
+
 ## 🚀 Quick Start
 
-1. Get your [OpenRouter](https://openrouter.ai/) api key.:
+1. Get your [OpenRouter](https://openrouter.ai/) api key
 
 ### Cursor IDE Setup
 
