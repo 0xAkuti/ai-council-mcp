@@ -27,9 +27,9 @@ dependencies = [
 ]
 
 [project.urls]
-Homepage = "https://github.com/0xAkuti/ai-council"
-Repository = "https://github.com/0xAkuti/ai-council.git"
-Issues = "https://github.com/0xAkuti/ai-council/issues"
+Homepage = "https://github.com/0xAkuti/ai-council-mcp"
+Repository = "https://github.com/0xAkuti/ai-council-mcp"
+Issues = "https://github.com/0xAkuti/ai-council-mcp/issues"
 
 [project.scripts]
 ai-council = "ai_council.main:main"
