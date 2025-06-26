@@ -270,7 +270,7 @@ class AICouncilServer:
                 write_stream,
                 InitializationOptions(
                     server_name="ai-council",
-                    server_version="0.1.0",
+                    server_version="0.2.1",
                     capabilities=self.server.get_capabilities(
                         notification_options=NotificationOptions(),
                         experimental_capabilities={}
@@ -312,7 +312,6 @@ def main():
             
             config = load_config(config_file=args.config, **config_kwargs)
             
-            print(config.model_dump_json(indent=2))
             server = AICouncilServer(config=config)
             await server.run()
         except (ConfigValidationError, ValueError) as e:

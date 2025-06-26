@@ -1,6 +1,6 @@
 [project]
 name = "ai-council"
-version = "0.1.0"
+version = "0.2.1"
 description = "Multi-AI consensus tool: MCP server that queries multiple AI models (OpenAI, Claude, Gemini, custom APIs) in parallel, synthesizes responses for better accuracy, and reduces AI bias through ensemble decision-making"
 authors = [{name = "Akuti", email = "a40723201+0xAkuti@users.noreply.github.com"}]
 license = {file = "LICENSE"}
