@@ -37,7 +37,7 @@ classifiers = [
     "Programming Language :: Python :: 3.13",
 ]
 dependencies = [
-    "mcp>=1.9.4",
+    "mcp>=1.9.4,<2",
     "httpx>=0.28.1",
     "pydantic>=2.11.7",
     "pyyaml>=6.0.2",
